@@ -41,7 +41,7 @@ jobs:
           for ABI in "${ABIS[@]}"; do
             BUILD_DIR=out/android-$ABI
             mkdir -p $BUILD_DIR
-            bin/gn gen $BUILD_DIR --args="is_official_build=true is_component_build=true ndk=\"$ANDROID_NDK_HOME\" target_cpu=\"$ABI\" "
+            bin/gn gen $BUILD_DIR --args="is_official_build=true is_component_build=true ndk=\"$ANDROID_NDK_HOME\" target_cpu=\"$ABI\" skia_use_expat=false skia_enable_fontmgr_android=false skia_enable_fontmgr_android_ndk=false"
             ninja -C $BUILD_DIR
           done
 
