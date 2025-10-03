@@ -7,62 +7,47 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NDK_VERSION: r27c
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      ANDROID_HOME: $HOME/Android/Sdk
 
     steps:
+      - name: Checkout Skia repo
+        uses: actions/checkout@v4
+        with:
+          repository: google/skia
+          path: skia
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 git cmake ninja-build wget unzip curl
+          sudo apt-get install -y python3 git cmake ninja-build wget unzip curl openjdk-11-jdk
 
-      - name: Set up Android NDK
-        id: setup-ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: ${{ env.NDK_VERSION }}
-          add-to-path: true
-
-      - name: Set environment variables
-        run: echo "ANDROID_NDK_PATH=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
-
-      - name: Setup depot_tools
-        run: |
-          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-          echo "$PWD/depot_tools" >> $GITHUB_PATH
-
-      - name: Checkout Skia
-        run: |
-          git clone https://github.com/google/skia.git skia
-          cd skia
-          git checkout main
-
-      - name: Fetch Skia dependencies
+      - name: Fetch Skia helper tool
         run: |
           cd skia
-          python3 tools/git-sync-deps
+          ./bin/fetch-sk
 
-      - name: Build Skia for Android (arm64)
+      - name: Download Android NDK via sk tool
         run: |
           cd skia
-          mkdir -p out/android-arm64
-          python3 tools/gn.py gen out/android-arm64 \
-            --args='
-            target_os="android"
-            target_cpu="arm64"
-            is_official_build=true
-            skia_use_system_freetype2=false
-            skia_use_gl=true
-            skia_use_vulkan=false
-            skia_use_metal=false
-            skia_use_fontconfig=false
-            ' 
-          ninja -C out/android-arm64
+          ./bin/sk asset download android_ndk_linux $HOME/ndk
+          echo "ANDROID_NDK_HOME=$HOME/ndk" >> $GITHUB_ENV
 
-      - name: Upload built .so and headers
+      - name: Build Skia for multiple Android ABIs
+        run: |
+          cd skia
+          ABIS=("arm" "arm64" "x86" "x64")
+          for ABI in "${ABIS[@]}"; do
+            mkdir -p out/android-$ABI
+            python3 tools/gn.py gen out/android-$ABI --args="ndk=\"$HOME/ndk\" target_cpu=\"$ABI\" is_official_build=true skia_use_gl=true skia_use_vulkan=false skia_use_metal=false skia_use_system_freetype2=false skia_use_fontconfig=false"
+            ninja -C out/android-$ABI
+          done
+
+      - name: Upload built .so files and headers
         uses: actions/upload-artifact@v4
         with:
           name: skia-android-artifact
           path: |
-            skia/out/android-arm64/libskia.so
+            skia/out/android-*/libskia.so
             skia/include/**/*
 
