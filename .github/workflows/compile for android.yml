@@ -1,0 +1,68 @@
+name: Build Skia Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: r27c
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 git cmake ninja-build wget unzip
+
+      - name: Set up Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: true
+  
+      - name: Set environment variables
+        run: |
+          echo "ANDROID_NDK_PATH=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
+
+      - name: Setup depot_tools
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$PWD/depot_tools" >> $GITHUB_PATH
+
+      - name: Checkout Skia
+        run: |
+          git clone https://github.com/google/skia.git
+          cd skia
+
+      - name: Fetch Skia dependencies
+        run: |
+          python3 tools/git-sync-deps
+
+      - name: Build Skia for Android
+        run: |
+          mkdir -p out/android
+          python3 tools/gn.py gen out/android \
+            --args='
+            target_os="android"
+            target_cpu="arm64"
+            is_official_build=true
+            skia_use_system_freetype2=false
+            skia_use_gl=true
+            skia_use_vulkan=false
+            skia_use_metal=false
+            skia_use_fontconfig=false
+            ' 
+          ninja -C out/android
+
+      - name: Upload built .so and headers
+        uses: actions/upload-artifact@v4
+        with:
+          name: skia-android-artifact
+          path: |
+            out/android/libskia.so
+            include/**/*
