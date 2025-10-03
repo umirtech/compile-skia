@@ -10,13 +10,10 @@ jobs:
       NDK_VERSION: r27c
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 git cmake ninja-build wget unzip
+          sudo apt-get install -y python3 git cmake ninja-build wget unzip curl
 
       - name: Set up Android NDK
         id: setup-ndk
@@ -24,10 +21,9 @@ jobs:
         with:
           ndk-version: ${{ env.NDK_VERSION }}
           add-to-path: true
-  
+
       - name: Set environment variables
-        run: |
-          echo "ANDROID_NDK_PATH=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
+        run: echo "ANDROID_NDK_PATH=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
 
       - name: Setup depot_tools
         run: |
@@ -36,17 +32,20 @@ jobs:
 
       - name: Checkout Skia
         run: |
-          git clone https://github.com/google/skia.git
+          git clone https://github.com/google/skia.git skia
           cd skia
+          git checkout main
 
       - name: Fetch Skia dependencies
         run: |
+          cd skia
           python3 tools/git-sync-deps
 
-      - name: Build Skia for Android
+      - name: Build Skia for Android (arm64)
         run: |
-          mkdir -p out/android
-          python3 tools/gn.py gen out/android \
+          cd skia
+          mkdir -p out/android-arm64
+          python3 tools/gn.py gen out/android-arm64 \
             --args='
             target_os="android"
             target_cpu="arm64"
@@ -57,12 +56,13 @@ jobs:
             skia_use_metal=false
             skia_use_fontconfig=false
             ' 
-          ninja -C out/android
+          ninja -C out/android-arm64
 
       - name: Upload built .so and headers
         uses: actions/upload-artifact@v4
         with:
           name: skia-android-artifact
           path: |
-            out/android/libskia.so
-            include/**/*
+            skia/out/android-arm64/libskia.so
+            skia/include/**/*
+
