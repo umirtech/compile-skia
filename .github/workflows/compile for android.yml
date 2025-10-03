@@ -22,26 +22,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 git cmake ninja-build wget unzip curl openjdk-11-jdk
 
-      - name: Fetch Skia helper tool
-        run: |
-          cd skia
-          ./bin/fetch-sk
-
       - name: Download Android NDK
         run: |
-          wget https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip android-ndk-r27c-linux.zip -d $HOME/ndk
+          mkdir -p $HOME/ndk
+          wget https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -O $HOME/ndk/android-ndk-r27c.zip
+          unzip -q $HOME/ndk/android-ndk-r27c.zip -d $HOME/ndk
           echo "ANDROID_NDK_HOME=$HOME/ndk/android-ndk-r27c" >> $GITHUB_ENV
-
 
       - name: Build Skia for multiple Android ABIs
         run: |
           cd skia
           ABIS=("arm" "arm64" "x86" "x64")
           for ABI in "${ABIS[@]}"; do
-            mkdir -p out/android-$ABI
-            python3 tools/gn.py gen out/android-$ABI --args="ndk=\"$HOME/ndk\" target_cpu=\"$ABI\" is_official_build=true skia_use_gl=true skia_use_vulkan=false skia_use_metal=false skia_use_system_freetype2=false skia_use_fontconfig=false"
-            ninja -C out/android-$ABI
+            BUILD_DIR=out/android-$ABI
+            mkdir -p $BUILD_DIR
+            python3 tools/gn.py gen $BUILD_DIR --args="is_official_build=true is_component_build=true ndk=\"$ANDROID_NDK_HOME\" target_cpu=\"$ABI\" skia_use_gl=true skia_use_vulkan=false skia_use_metal=false skia_use_system_freetype2=false skia_use_fontconfig=false"
+            ninja -C $BUILD_DIR
           done
 
       - name: Upload built .so files and headers
