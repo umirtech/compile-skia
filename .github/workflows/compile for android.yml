@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-      ANDROID_HOME: $HOME/Android/Sdk
 
     steps:
       - name: Checkout Skia repo
@@ -29,6 +28,11 @@ jobs:
           unzip -q $HOME/ndk/android-ndk-r27c.zip -d $HOME/ndk
           echo "ANDROID_NDK_HOME=$HOME/ndk/android-ndk-r27c" >> $GITHUB_ENV
 
+      - name: Fetch Skia dependencies
+        run: |
+          cd skia
+          python3 tools/git-sync-deps
+
       - name: Build Skia for multiple Android ABIs
         run: |
           cd skia
@@ -36,7 +40,7 @@ jobs:
           for ABI in "${ABIS[@]}"; do
             BUILD_DIR=out/android-$ABI
             mkdir -p $BUILD_DIR
-            python3 tools/gn.py gen $BUILD_DIR --args="is_official_build=true is_component_build=true ndk=\"$ANDROID_NDK_HOME\" target_cpu=\"$ABI\" skia_use_gl=true skia_use_vulkan=false skia_use_metal=false skia_use_system_freetype2=false skia_use_fontconfig=false"
+            bin/gn gen $BUILD_DIR --args="is_official_build=true is_component_build=true ndk=\"$ANDROID_NDK_HOME\" target_cpu=\"$ABI\" skia_use_gl=true skia_use_vulkan=false skia_use_metal=false skia_use_system_freetype2=false skia_use_fontconfig=false"
             ninja -C $BUILD_DIR
           done
 
@@ -47,4 +51,3 @@ jobs:
           path: |
             skia/out/android-*/libskia.so
             skia/include/**/*
-
